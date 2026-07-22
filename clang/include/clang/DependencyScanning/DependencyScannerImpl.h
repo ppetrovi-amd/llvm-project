@@ -15,6 +15,8 @@
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include <mutex>
+#include <thread>
 
 namespace clang {
 class DiagnosticConsumer;
@@ -83,6 +85,37 @@ std::shared_ptr<ModuleDepCollector> initializeScanInstanceDependencyCollector(
     DependencyActionController &Controller,
     PrebuiltModulesAttrsMap PrebuiltModulesASTMap,
     SmallVector<StringRef> &StableDirs);
+
+/// Manages (and terminates) the asynchronous compilation of modules.
+class AsyncModuleCompiles {
+  std::mutex Mutex;
+  bool Stop = false;
+  // FIXME: Have the service own a thread pool and use that instead.
+  std::vector<std::thread> Compiles;
+
+public:
+  /// Registers the module compilation, unless this instance is about to be
+  /// destroyed.
+  void add(llvm::unique_function<void()> Compile) {
+    std::lock_guard<std::mutex> Lock(Mutex);
+    if (!Stop)
+      Compiles.emplace_back(std::move(Compile));
+  }
+
+  ~AsyncModuleCompiles() {
+    {
+      std::lock_guard<std::mutex> Lock(Mutex);
+      Stop = true;
+    }
+    for (std::thread &Compile : Compiles)
+      Compile.join();
+  }
+};
+
+void runTUModulePrescan(CompilerInstance &PrescanCI,
+                        DependencyScanningService &Service,
+                        DependencyActionController &Controller,
+                        AsyncModuleCompiles &Compiles);
 } // namespace dependencies
 } // namespace clang
 

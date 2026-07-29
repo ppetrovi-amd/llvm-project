@@ -764,7 +764,7 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST_,
 
   if (ST.hasVOP3PInsts() && ST.hasAddNoCarryInsts() && ST.hasIntClamp()) {
     // Full set of gfx9 features.
-    if (ST.hasPackedU64Ops()) {
+    if (ST.hasAnyPackedU64Ops()) {
       getActionDefinitionsBuilder({G_ADD, G_SUB})
           .legalFor({S64, S32, S16, V2S16, V2S64})
           .clampMaxNumElementsStrict(0, S16, 2)
@@ -1003,12 +1003,12 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST_,
     FPOpActions.clampMaxNumElementsStrict(0, S32, 2);
   }
 
-  if (ST.hasPackedFP64Ops()) {
+  if (ST.hasAnyPackedFP64Ops()) {
     FPOpActions.legalFor({V2S64});
     FPOpActions.clampMaxNumElementsStrict(0, S64, 2);
   }
 
-  if (ST.hasPackedFP64Ops()) {
+  if (ST.hasAnyPackedFP64Ops()) {
     FPOpActions.legalFor({V2S64});
     FPOpActions.clampMaxNumElementsStrict(0, S64, 2);
   }
@@ -1033,7 +1033,7 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST_,
   auto &MinNumMaxNum = getActionDefinitionsBuilder(
       {G_FMINNUM, G_FMAXNUM, G_FMINIMUMNUM, G_FMAXIMUMNUM});
 
-  if (ST.hasPackedFP64Ops()) {
+  if (ST.hasAnyPackedFP64Ops()) {
     MinNumMaxNum.customFor(FPTypesPK16_64)
         .moreElementsIf(isSmallOddVector(0), oneMoreElement(0))
         .clampMaxNumElements(0, S16, 2)

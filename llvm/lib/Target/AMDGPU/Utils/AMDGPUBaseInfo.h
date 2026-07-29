@@ -1687,9 +1687,9 @@ bool isArgPassedInSGPR(const Argument *Arg);
 
 bool isArgPassedInSGPR(const CallBase *CB, unsigned ArgNo);
 
-LLVM_READONLY bool isPackedFP32Inst(unsigned Opc);
+LLVM_READONLY bool isPackedSingleSGPRFP32Inst(unsigned Opc);
 
-LLVM_READONLY bool isPacked64BitInst(unsigned Opc);
+LLVM_READONLY bool isPackedSingleSGPR64BitInst(unsigned Opc);
 
 /// Packed instructions that read a single SGPR for SGPR operands, except for
 /// 64-bit elements which read two SGPRs.

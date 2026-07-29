@@ -736,6 +736,10 @@ defm PackedFP32Ops : AMDGPUSubtargetFeature<"packed-fp32-ops",
   "Support packed fp32 instructions"
 >;
 
+defm PackedFP32SingleSGPROps : AMDGPUSubtargetFeature<"packed-fp32-single-sgpr-ops",
+  "Support packed fp32 instructions with SGPR operands propagating low to high 32 bit"
+>;
+
 defm PackedFP64Ops : AMDGPUSubtargetFeature<"packed-fp64-ops",
   "Support packed fp64 instructions"
 >;
@@ -2209,7 +2213,7 @@ def FeatureISAVersion12_50_Common : FeatureSet<
    FeatureLDSBankCount32,
    FeatureDLInsts,
    FeatureFmacF64Inst,
-   FeaturePackedFP32Ops,
+   FeaturePackedFP32SingleSGPROps,
    FeatureDot7Insts,
    FeatureDot8Insts,
    FeatureWavefrontSize32,
@@ -2927,6 +2931,9 @@ def HasSignedDotInsts : Predicate<"Subtarget->hasDot1Insts() || Subtarget->hasDo
   AssemblerPredicate<(any_of FeatureDot1Insts, FeatureDot8Insts)>;
 
 def NotHasIEEEMinimumMaximumInsts : Predicate<"!Subtarget->hasIEEEMinimumMaximumInsts()">;
+
+def HasAnyPackedFP32Ops : Predicate<"Subtarget->hasAnyPackedFP32Ops()">,
+  AssemblerPredicate<(any_of FeaturePackedFP32Ops, FeaturePackedFP32SingleSGPROps)>;
 
 def NotHasCvtFP8VOP1Bug : Predicate<"!Subtarget->hasCvtFP8VOP1Bug()">;
 

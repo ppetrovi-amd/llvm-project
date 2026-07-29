@@ -998,7 +998,7 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST_,
     FDIVActions.customFor({S16});
   }
 
-  if (ST.hasPackedFP32Ops()) {
+  if (ST.hasAnyPackedFP32Ops()) {
     FPOpActions.legalFor({V2S32});
     FPOpActions.clampMaxNumElementsStrict(0, S32, 2);
   }
@@ -1073,9 +1073,9 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST_,
 
   auto &FNegAbs = getActionDefinitionsBuilder({G_FNEG, G_FABS});
   FNegAbs.legalFor(FPTypesPK16)
-      .legalFor(ST.hasPackedFP32Ops(), {V2S32})
+      .legalFor(ST.hasAnyPackedFP32Ops(), {V2S32})
       .clampMaxNumElementsStrict(0, S16, 2);
-  if (ST.hasPackedFP32Ops())
+  if (ST.hasAnyPackedFP32Ops())
     FNegAbs.clampMaxNumElementsStrict(0, S32, 2);
   FNegAbs.scalarize(0).clampScalar(0, S16, S64);
 
@@ -1176,7 +1176,7 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST_,
       .lowerFor({S64, S16, V2S16});
   }
 
-  if (ST.hasPackedFP32Ops())
+  if (ST.hasAnyPackedFP32Ops())
     FSubActions.lowerFor({V2S32}).clampMaxNumElements(0, S32, 2);
 
   FSubActions

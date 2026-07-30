@@ -15,22 +15,50 @@
 
 namespace llvm::sandboxir {
 
+static SmallVector<unsigned, 2> getOperandIndicesInUser(User *U, Value *Op) {
+  SmallVector<unsigned, 2> OpIdxVec;
+  for (unsigned Idx : seq<unsigned>(U->getNumOperands()))
+    if (U->getOperand(Idx) == Op)
+      OpIdxVec.push_back(Idx);
+  return OpIdxVec;
+}
+
+static std::optional<BundleTy> getMatchingBundle(ArrayRef<Value *> Bndl, const InstrMaps &IMaps, Value *Seed, Instruction *SeedUserInst, SmallPtrSet<Instruction *, 4> &Claimed) {
+  SmallVector<unsigned, 2> OpIdxVec0 = getOperandIndicesInUser(SeedUserInst, Seed);
+  assert(!OpIdxVec0.empty() && "U0 does not use Seed!");
+  BundleTy NextUserBndl;
+  NextUserBndl.push_back(SeedUserInst);
+  Claimed.insert(SeedUserInst);
+  for (Value *V : drop_begin(Bndl)) {
+    Instruction *Match = nullptr;
+    for (User *U : V->users()) {
+      auto *UI = dyn_cast<Instruction>(U);
+      if (!UI || IMaps.isVectorized(UI) || Claimed.contains(UI) ||
+          UI->getOpcode() != SeedUserInst->getOpcode() ||
+          UI->getType() != SeedUserInst->getType() ||
+          UI->getParent() != SeedUserInst->getParent() ||
+          getOperandIndicesInUser(UI, V) != OpIdxVec0)
+        continue;
+
+      Match = UI;
+      break;
+    }
+    if (!Match)
+      return std::nullopt;
+    NextUserBndl.push_back(Match);
+  }
+
+  for (auto *I : NextUserBndl)
+    Claimed.insert(cast<Instruction>(I));
+  return NextUserBndl;
+}
+
 SmallVector<BundleTy>
 VecUtils::getNextUserBundles(ArrayRef<Value *> Bndl, const InstrMaps &IMaps,
                              SmallPtrSet<Instruction *, 4> &Claimed) {
   SmallVector<BundleTy> Bundles;
   if (Bndl.empty())
     return Bundles;
-
-  // Collect the operand indices at which \p U uses \p V. Operands are scanned
-  // in ascending order, so the result is sorted.
-  auto GetOpIdxVec = [](Value *V, User *U) -> SmallVector<unsigned, 2> {
-    SmallVector<unsigned, 2> OpIdxVec;
-    for (unsigned Idx : seq<unsigned>(U->getNumOperands()))
-      if (U->getOperand(Idx) == V)
-        OpIdxVec.push_back(Idx);
-    return OpIdxVec;
-  };
 
   Value *V0 = Bndl[0];
   DenseSet<User *> SeenUsers;
@@ -42,59 +70,9 @@ VecUtils::getNextUserBundles(ArrayRef<Value *> Bndl, const InstrMaps &IMaps,
     auto *UI0 = dyn_cast<Instruction>(U0);
     if (!UI0 || IMaps.isVectorized(UI0) || Claimed.contains(UI0))
       continue;
-
-    // The operand indices at which lane 0's user U0 uses lane 0's value V0.
-    // Every other lane's user must use its lane value at the exact same operand
-    // indices; otherwise the widened user's operands can't be grouped
-    // consistently (each vector operand lane must come from the same position).
-    SmallVector<unsigned, 2> OpIdxVec0 = GetOpIdxVec(V0, UI0);
-    assert(!OpIdxVec0.empty() && "U0 does not use V0!");
-
-    // Find a distinct matching user for each of the remaining lanes.
-    BundleTy NextUserBndl;
-    NextUserBndl.push_back(UI0);
-    // Tentatively claim UI0; roll back if a full bundle can't be formed.
-    SmallVector<Instruction *, 4> NewlyClaimed;
-    Claimed.insert(UI0);
-    NewlyClaimed.push_back(UI0);
-    for (Value *V : drop_begin(Bndl)) {
-      Instruction *Match = nullptr;
-      for (User *U : V->users()) {
-        auto *UI = dyn_cast<Instruction>(U);
-        if (!UI || IMaps.isVectorized(UI) || Claimed.contains(UI))
-          continue;
-        if (UI->getOpcode() != UI0->getOpcode() ||
-            UI->getType() != UI0->getType())
-          continue;
-        if (UI->getParent() != UI0->getParent())
-          continue;
-
-        // Require the same operand-usage pattern as lane 0 (same indices, in
-        // order). This rejects both operand-index mismatches and cases where V
-        // is used a different number of times than V0 is in U0.
-        if (GetOpIdxVec(V, UI) != OpIdxVec0)
-          continue;
-
-        Match = UI;
-        break;
-      }
-      if (!Match) {
-        NextUserBndl.clear();
-        break;
-      }
-      Claimed.insert(Match);
-      NewlyClaimed.push_back(Match);
-      NextUserBndl.push_back(Match);
-    }
-
-    if (NextUserBndl.size() == Bndl.size()) {
-      Bundles.emplace_back(std::move(NextUserBndl));
-    } else {
-      // Failed to form a full bundle; release the instructions we tentatively
-      // claimed so they remain available for other lane-0 users.
-      for (Instruction *I : NewlyClaimed)
-        Claimed.erase(I);
-    }
+    std::optional<BundleTy> NextUserBndl = getMatchingBundle(Bndl, IMaps, V0, UI0, Claimed);
+    if (NextUserBndl)
+      Bundles.emplace_back(std::move(*NextUserBndl));
   }
   return Bundles;
 }

@@ -925,12 +925,13 @@ entry:
                  auto *Ld1 = &*It++;
                  auto *Add0 = &*It++;
                  auto *Add1 = &*It++;
-
+                 
                  ASSERT_EQ(Add0->getOperand(0), Ld0);
                  ASSERT_EQ(Add1->getOperand(0), Ld1);
-
+                 
+                 SmallPtrSet<sandboxir::Instruction *, 4> Claimed;
                  auto NextUserBundles =
-                     sandboxir::VecUtils::getNextUserBundles({Ld0, Ld1}, IMaps);
+                     sandboxir::VecUtils::getNextUserBundles({Ld0, Ld1}, IMaps, Claimed);
                  ASSERT_EQ(NextUserBundles.size(), 1u);
                  ASSERT_EQ(NextUserBundles[0].size(), 2u);
                  EXPECT_EQ(NextUserBundles[0][0], Add0);
@@ -944,8 +945,9 @@ entry:
     std::advance(It, 2);
     auto *Ld0 = &*It++;
     auto *Ld1 = &*It++;
+    SmallPtrSet<sandboxir::Instruction *, 4> Claimed;
     EXPECT_TRUE(
-        sandboxir::VecUtils::getNextUserBundles({Ld0, Ld1}, IMaps).empty());
+        sandboxir::VecUtils::getNextUserBundles({Ld0, Ld1}, IMaps, Claimed).empty());
   });
 
   withFunction(
@@ -954,8 +956,9 @@ entry:
         auto It = BB.begin();
         auto *F0 = &*It++;
         auto *D1 = &*It++;
+        SmallPtrSet<sandboxir::Instruction *, 4> Claimed;
         EXPECT_TRUE(
-            sandboxir::VecUtils::getNextUserBundles({F0, D1}, IMaps).empty());
+            sandboxir::VecUtils::getNextUserBundles({F0, D1}, IMaps, Claimed).empty());
       });
 
   withFunction("block_mismatch", [](sandboxir::Function &F,
@@ -965,8 +968,9 @@ entry:
     std::advance(It, 2);
     auto *Ld0 = &*It++;
     auto *Ld1 = &*It++;
+    SmallPtrSet<sandboxir::Instruction *, 4> Claimed;
     EXPECT_TRUE(
-        sandboxir::VecUtils::getNextUserBundles({Ld0, Ld1}, IMaps).empty());
+        sandboxir::VecUtils::getNextUserBundles({Ld0, Ld1}, IMaps, Claimed).empty());
   });
 
   withFunction("operand_mismatch", [](sandboxir::Function &F,
@@ -976,8 +980,9 @@ entry:
     std::advance(It, 2);
     auto *Ld0 = &*It++;
     auto *Ld1 = &*It++;
+    SmallPtrSet<sandboxir::Instruction *, 4> Claimed;
     EXPECT_TRUE(
-        sandboxir::VecUtils::getNextUserBundles({Ld0, Ld1}, IMaps).empty());
+        sandboxir::VecUtils::getNextUserBundles({Ld0, Ld1}, IMaps, Claimed).empty());
   });
 
   withFunction("duplicate_operand_mismatch", [](sandboxir::Function &F,
@@ -989,8 +994,9 @@ entry:
     auto *Ld1 = &*It++;
     // Lane 0's user uses Ld0 at operands {0, 1} but lane 1's user
     // uses Ld1 only at operand {0}, so no bundle should form.
+    SmallPtrSet<sandboxir::Instruction *, 4> Claimed;
     EXPECT_TRUE(
-        sandboxir::VecUtils::getNextUserBundles({Ld0, Ld1}, IMaps).empty());
+        sandboxir::VecUtils::getNextUserBundles({Ld0, Ld1}, IMaps, Claimed).empty());
   });
 
   withFunction("missing_lane_user", [](sandboxir::Function &F,
@@ -1000,8 +1006,9 @@ entry:
     std::advance(It, 2);
     auto *Ld0 = &*It++;
     auto *Ld1 = &*It++;
+    SmallPtrSet<sandboxir::Instruction *, 4> Claimed;
     EXPECT_TRUE(
-        sandboxir::VecUtils::getNextUserBundles({Ld0, Ld1}, IMaps).empty());
+        sandboxir::VecUtils::getNextUserBundles({Ld0, Ld1}, IMaps, Claimed).empty());
   });
 
   withFunction("vectorized_user", [](sandboxir::Function &F,
@@ -1016,8 +1023,9 @@ entry:
     (void)Add0;
     sandboxir::Action A(nullptr, {Add1}, {}, 0);
     IMaps.registerVector({Add1}, &A);
+    SmallPtrSet<sandboxir::Instruction *, 4> Claimed;
     EXPECT_TRUE(
-        sandboxir::VecUtils::getNextUserBundles({Ld0, Ld1}, IMaps).empty());
+        sandboxir::VecUtils::getNextUserBundles({Ld0, Ld1}, IMaps, Claimed).empty());
   });
 
   withFunction("vectorized_seed_user", [](sandboxir::Function &F,
@@ -1030,7 +1038,8 @@ entry:
     auto *Add0 = &*It++;
     sandboxir::Action A(nullptr, {Add0}, {}, 0);
     IMaps.registerVector({Add0}, &A);
+    SmallPtrSet<sandboxir::Instruction *, 4> Claimed;
     EXPECT_TRUE(
-        sandboxir::VecUtils::getNextUserBundles({Ld0, Ld1}, IMaps).empty());
+        sandboxir::VecUtils::getNextUserBundles({Ld0, Ld1}, IMaps, Claimed).empty());
   });
 }

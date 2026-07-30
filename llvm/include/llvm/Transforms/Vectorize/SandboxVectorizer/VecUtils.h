@@ -231,6 +231,8 @@ public:
 
   /// For each user of lane 0 in \p Bndl, try to form a bundle of matching
   /// users for all lanes. Returns all complete user bundles found.
+  /// \p Claimed contains instructions that have already been claimed by a
+  /// bundle.
   LLVM_ABI static SmallVector<BundleTy>
   getNextUserBundles(ArrayRef<Value *> Bndl, const InstrMaps &IMaps,
                      SmallPtrSet<Instruction *, 4> &Claimed);

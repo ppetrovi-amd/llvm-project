@@ -30,8 +30,12 @@ static SmallVector<unsigned, 2> getOperandIndicesInUser(User *U, Value *Op) {
   return OpIdxVec;
 }
 
-static std::optional<BundleTy> getMatchingBundle(ArrayRef<Value *> Bndl, const InstrMaps &IMaps, Value *Seed, Instruction *SeedUserInst, SmallPtrSet<Instruction *, 4> &Claimed) {
-  SmallVector<unsigned, 2> OpIdxVec0 = getOperandIndicesInUser(SeedUserInst, Seed);
+static std::optional<BundleTy>
+getMatchingBundle(ArrayRef<Value *> Bndl, const InstrMaps &IMaps, Value *Seed,
+                  Instruction *SeedUserInst,
+                  SmallPtrSet<Instruction *, 4> &Claimed) {
+  SmallVector<unsigned, 2> OpIdxVec0 =
+      getOperandIndicesInUser(SeedUserInst, Seed);
   assert(!OpIdxVec0.empty() && "U0 does not use Seed!");
   BundleTy NextUserBndl;
   NextUserBndl.push_back(SeedUserInst);
@@ -81,7 +85,8 @@ VecUtils::getNextUserBundles(ArrayRef<Value *> Bndl, const InstrMaps &IMaps,
     auto *UI0 = dyn_cast<Instruction>(U0);
     if (!UI0 || IMaps.isVectorized(UI0) || Claimed.contains(UI0))
       continue;
-    std::optional<BundleTy> NextUserBndl = getMatchingBundle(Bndl, IMaps, V0, UI0, Claimed);
+    std::optional<BundleTy> NextUserBndl =
+        getMatchingBundle(Bndl, IMaps, V0, UI0, Claimed);
     if (NextUserBndl)
       Bundles.emplace_back(std::move(*NextUserBndl));
   }
